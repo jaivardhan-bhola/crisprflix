@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Nav from '../components/Nav';
 import Banner from '../components/Banner';
 import Row from '../components/Row';
@@ -18,7 +18,32 @@ export default function Home() {
   const [showResults, setShowResults] = useState(false);
   const [category, setCategory] = useState("Home");
 
-  // ... (search effect)
+  useEffect(() => {
+    const handleSearch = async () => {
+      if (searchQuery.length > 0) {
+        try {
+          const API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
+          const url = `https://api.themoviedb.org/3/search/multi?api_key=${API_KEY}&language=en-US&query=${encodeURIComponent(searchQuery)}&page=1&include_adult=false`;
+          const res = await fetch(url);
+          const data = await res.json();
+          setSearchResults(data.results || []);
+          setShowResults(true);
+        } catch (error) {
+          console.error("Search failed", error);
+        }
+      } else {
+        setShowResults(false);
+        setSearchResults([]);
+      }
+    };
+
+    // Debounce search
+    const timeoutId = setTimeout(() => {
+      handleSearch();
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery]);
 
   const handleMovieClick = (movie) => {
     if (!movie) return;
