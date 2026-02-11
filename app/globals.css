@@ -1,0 +1,26 @@
+@import "tailwindcss";
+
+@theme {
+  --color-netflix-black: #141414;
+  --color-netflix-red: #E50914;
+}
+
+:root {
+  --background: #141414;
+  --foreground: #ffffff;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+  overflow-x: hidden;
+}
+
+@utility scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
