@@ -243,15 +243,17 @@ export default function Details() {
                                 <div className="absolute top-4 left-4 flex flex-col space-y-2 z-50">
 
                                     <div className="flex space-x-2">
-                                        {Object.keys(type === 'movie' ? movieServers : tvServers).map((server) => (
-                                            <button
-                                                key={server}
-                                                onClick={() => setSelectedServer(server)}
-                                                className={`px-3 py-1 rounded text-sm font-medium transition-colors shadow-md ${selectedServer === server ? 'bg-[#e50914] text-white' : 'bg-gray-800/80 text-gray-400 hover:bg-gray-700'}`}
-                                            >
-                                                {server}
-                                            </button>
-                                        ))}
+                                        <select
+                                            value={selectedServer}
+                                            onChange={(e) => setSelectedServer(e.target.value)}
+                                            className="bg-black/80 text-white text-sm border border-gray-700 rounded px-2 py-1 outline-none focus:border-[#e50914]"
+                                        >
+                                            {Object.keys(type === 'movie' ? movieServers : tvServers).map((server) => (
+                                                <option key={server} value={server}>
+                                                    {server}
+                                                </option>
+                                            ))}
+                                        </select>
                                     </div>
 
                                     {type === 'tv' && movie.seasons && (
