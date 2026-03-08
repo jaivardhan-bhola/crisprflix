@@ -51,6 +51,11 @@ function Nav({ searchQuery, setSearchQuery, setCategory, currentCategory }) {
                         >
                             Movies
                         </li>
+                        <li>
+                            <Link href="/f1" className="hover:text-white transition-colors">
+                                Formula 1
+                            </Link>
+                        </li>
                     </ul>
                 </div>
 
