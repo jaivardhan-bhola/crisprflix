@@ -5,6 +5,7 @@ import Nav from '../components/Nav';
 import Banner from '../components/Banner';
 import Row from '../components/Row';
 import requests from '../utils/requests';
+import { getContinueWatching } from '../utils/continueWatching';
 
 import { useRouter } from 'next/navigation';
 
@@ -17,6 +18,18 @@ export default function Home() {
   const [searchResults, setSearchResults] = useState([]);
   const [showResults, setShowResults] = useState(false);
   const [category, setCategory] = useState("Home");
+  const [continueWatching, setContinueWatching] = useState([]);
+
+  useEffect(() => {
+    const fetchContinueWatching = () => {
+      setContinueWatching(getContinueWatching());
+    };
+
+    fetchContinueWatching();
+
+    window.addEventListener('continueWatchingUpdated', fetchContinueWatching);
+    return () => window.removeEventListener('continueWatchingUpdated', fetchContinueWatching);
+  }, []);
 
   useEffect(() => {
     const handleSearch = async () => {
@@ -45,7 +58,7 @@ export default function Home() {
     return () => clearTimeout(timeoutId);
   }, [searchQuery]);
 
-  const handleMovieClick = (movie) => {
+  const handleMovieClick = (movie, play = false) => {
     if (!movie) return;
 
     // Determine type: explicitly set or infer
@@ -59,7 +72,7 @@ export default function Home() {
       }
     }
 
-    router.push(`/${type}/${movie.id}`);
+    router.push(`/${type}/${movie.id}${play ? '?play=true' : ''}`);
   };
 
   // Remove closeModal as it's no longer used for Modal
@@ -116,6 +129,15 @@ export default function Home() {
         <>
           <Banner onMovieClick={handleMovieClick} />
           <div className="pl-4 pb-8 -mt-32 relative z-10 space-y-8">
+            {/* Continue Watching Row */}
+            {category === "Home" && continueWatching.length > 0 && (
+              <Row
+                title="Continue Watching"
+                data={continueWatching}
+                onMovieClick={(movie) => handleMovieClick(movie, true)}
+              />
+            )}
+
             {/* Primary Large Row (Trending) */}
             <Row
               title={trending.title}

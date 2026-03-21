@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 
-function Row({ title, fetchUrl, isLargeRow = false, onMovieClick }) {
+function Row({ title, fetchUrl, data, isLargeRow = false, onMovieClick }) {
     const [movies, setMovies] = useState([]);
     const rowRef = useRef(null);
     const [isMoved, setIsMoved] = useState(false);
@@ -17,13 +17,19 @@ function Row({ title, fetchUrl, isLargeRow = false, onMovieClick }) {
     const base_url = "https://image.tmdb.org/t/p/original/";
 
     useEffect(() => {
+        if (data) {
+            setMovies(data);
+            return;
+        }
+        
         async function fetchData() {
+            if (!fetchUrl) return;
             const request = await axios.get(fetchUrl);
             setMovies(request.data.results);
             return request;
         }
         fetchData();
-    }, [fetchUrl]);
+    }, [fetchUrl, data]);
 
     const handleClick = (direction) => {
         setIsMoved(true);
@@ -98,6 +104,11 @@ function Row({ title, fetchUrl, isLargeRow = false, onMovieClick }) {
                                         <p className="text-[10px] md:text-xs text-white font-bold truncate">
                                             {movie.title || movie.name}
                                         </p>
+                                        {movie.media_type === 'tv' && movie.lastWatchedSeason !== undefined && movie.lastWatchedSeason !== null && (
+                                            <p className="text-[8px] md:text-[10px] text-gray-300">
+                                                S{movie.lastWatchedSeason} E{movie.lastWatchedEpisode}
+                                            </p>
+                                        )}
                                     </div>
                                 )}
                             </div>
