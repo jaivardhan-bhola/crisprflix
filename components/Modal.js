@@ -28,11 +28,10 @@ function Modal({ movie, onClose }) {
                         <h2 className="text-4xl font-bold text-white mb-2">
                             {movie.title || movie.name || movie.original_name}
                         </h2>
-                        <div className="flex items-center gap-4 text-sm font-semibold text-green-400">
-                            <span className="flex items-center gap-1">
-                                <Star className="w-4 h-4 fill-current" />
-                                {Math.round(movie.vote_average * 10)}% Match
-                            </span>
+                        <div className="flex items-center gap-4 text-sm font-semibold">
+                            <div className="flex items-center gap-1.5 bg-[#01b4e4] text-white px-1.5 py-0.5 rounded-sm font-black text-xs">
+                                TMDB {movie.vote_average?.toFixed(1)}
+                            </div>
                             <span className="text-gray-300 flex items-center gap-1">
                                 <Calendar className="w-4 h-4" />
                                 {movie.release_date || movie.first_air_date}

@@ -3,6 +3,7 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { getEpisodeProgress } from '../utils/continueWatching';
 
 function Row({ title, fetchUrl, data, isLargeRow = false, onMovieClick }) {
     const [movies, setMovies] = useState([]);
@@ -66,6 +67,32 @@ function Row({ title, fetchUrl, data, isLargeRow = false, onMovieClick }) {
         rowRef.current.scrollLeft = scrollLeft - walk;
     };
 
+    const getTimeLeft = (movie) => {
+        const progressData = getEpisodeProgress(movie.id);
+        const progressKey = movie.media_type === 'tv' 
+            ? `s${movie.lastWatchedSeason}e${movie.lastWatchedEpisode}` 
+            : 'movie';
+        
+        const progress = progressData[progressKey];
+        if (progress > 0 && progress < 90) {
+            const runtime = movie.media_type === 'movie'
+                ? movie.runtime
+                : (movie.episode_run_time?.[0] || 45);
+
+            if (runtime) {
+                const minsLeft = Math.round(runtime * (1 - progress / 100));
+                if (minsLeft <= 0) return null;
+
+                const h = Math.floor(minsLeft / 60);
+                const m = minsLeft % 60;
+
+                if (h > 0) return `${h}hr ${m}m`;
+                return `${m}m`;
+            }
+        }
+        return null;
+    };
+
 
     return (
         <div className="space-y-0.5 md:space-y-2 px-4 group">
@@ -104,11 +131,18 @@ function Row({ title, fetchUrl, data, isLargeRow = false, onMovieClick }) {
                                         <p className="text-[10px] md:text-xs text-white font-bold truncate">
                                             {movie.title || movie.name}
                                         </p>
-                                        {movie.media_type === 'tv' && movie.lastWatchedSeason !== undefined && movie.lastWatchedSeason !== null && (
-                                            <p className="text-[8px] md:text-[10px] text-gray-300">
-                                                S{movie.lastWatchedSeason} E{movie.lastWatchedEpisode}
-                                            </p>
-                                        )}
+                                        <div className="flex items-center gap-2">
+                                            {movie.media_type === 'tv' && movie.lastWatchedSeason !== undefined && movie.lastWatchedSeason !== null && (
+                                                <p className="text-[8px] md:text-[10px] text-gray-300">
+                                                    S{movie.lastWatchedSeason} E{movie.lastWatchedEpisode}
+                                                </p>
+                                            )}
+                                            {getTimeLeft(movie) && (
+                                                <p className="text-[8px] md:text-[10px] text-[#e50914] font-bold">
+                                                    {movie.media_type === 'tv' ? '• ' : ''}{getTimeLeft(movie)} left
+                                                </p>
+                                            )}
+                                        </div>
                                     </div>
                                 )}
                             </div>
