@@ -756,7 +756,11 @@ export default function Details() {
                                 {/* Cast Grid */}
                                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6 mb-12">
                                     {movie.credits?.cast?.slice(0, 12).map(person => (
-                                        <div key={person.id} className="flex flex-col items-center text-center group">
+                                        <div 
+                                            key={person.id} 
+                                            onClick={() => router.push(`/person/${person.id}`)}
+                                            className="flex flex-col items-center text-center group cursor-pointer"
+                                        >
                                             <div className="w-24 h-24 md:w-28 md:h-28 rounded-full overflow-hidden mb-3 border-2 border-zinc-800 group-hover:border-[#e50914] transition-all duration-300 shadow-lg">
                                                 <img
                                                     src={person.profile_path ? `https://image.tmdb.org/t/p/w185/${person.profile_path}` : 'https://via.placeholder.com/185x185?text=No+Image'}
@@ -775,8 +779,12 @@ export default function Details() {
                                         <span className="text-zinc-500 block text-[10px] uppercase font-black tracking-widest mb-3">Creative Leads</span>
                                         <div className="space-y-3">
                                             {movie.credits?.crew?.filter(c => ['Director', 'Executive Producer', 'Producer'].includes(c.job)).slice(0, 4).map(person => (
-                                                <div key={`${person.id}-${person.job}`}>
-                                                    <p className="text-zinc-100 font-bold text-sm">{person.name}</p>
+                                                <div 
+                                                    key={`${person.id}-${person.job}`}
+                                                    onClick={() => router.push(`/person/${person.id}`)}
+                                                    className="cursor-pointer group/crew"
+                                                >
+                                                    <p className="text-zinc-100 font-bold text-sm group-hover/crew:text-[#e50914] transition">{person.name}</p>
                                                     <p className="text-zinc-500 text-xs uppercase tracking-tighter">{person.job}</p>
                                                 </div>
                                             ))}

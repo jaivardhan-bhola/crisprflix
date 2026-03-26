@@ -1,0 +1,6 @@
+    {
+        "Server A": "https://111movies.com/movie/{tmdbId}?autoplay=1",
+        "Server B": "https://vidsrc.xyz/embed/movie/{tmdbId}",
+        "Server C": "https://vidfast.pro/movie/{tmdbId}",
+        "Server D": "https://player.videasy.net/movie/{tmdbId}"
+    }

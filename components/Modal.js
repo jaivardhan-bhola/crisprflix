@@ -46,7 +46,6 @@ function Modal({ movie, onClose }) {
                     </p>
                     <div className="mt-4 text-sm text-gray-500">
                         <span className="block">Original Language: {movie.original_language?.toUpperCase()} </span>
-                        <span className="block">Popularity: {Math.round(movie.popularity)}</span>
                     </div>
                 </div>
             </div>
