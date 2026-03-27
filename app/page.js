@@ -1,24 +1,32 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Nav from '../components/Nav';
 import Banner from '../components/Banner';
 import Row from '../components/Row';
 import requests from '../utils/requests';
 import { getContinueWatching } from '../utils/continueWatching';
-
-import { useRouter } from 'next/navigation';
-
-// ... (previous imports)
+import Skeleton from '../components/Skeleton';
+import Footer from '../components/Footer';
+import { Star } from 'lucide-react';
 
 export default function Home() {
-  const router = useRouter(); // Initialize router
-  const [selectedMovie, setSelectedMovie] = useState(null);
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [category, setCategory] = useState("Home");
   const [continueWatching, setContinueWatching] = useState([]);
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const categoryParam = searchParams.get('category');
+    if (categoryParam) {
+      setCategory(categoryParam);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const fetchContinueWatching = () => {
@@ -26,7 +34,6 @@ export default function Home() {
     };
 
     fetchContinueWatching();
-
     window.addEventListener('continueWatchingUpdated', fetchContinueWatching);
     return () => window.removeEventListener('continueWatchingUpdated', fetchContinueWatching);
   }, []);
@@ -34,15 +41,18 @@ export default function Home() {
   useEffect(() => {
     const handleSearch = async () => {
       if (searchQuery.length > 0) {
+        setIsSearching(true);
+        setShowResults(true);
         try {
           const API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
           const url = `https://api.themoviedb.org/3/search/multi?api_key=${API_KEY}&language=en-US&query=${encodeURIComponent(searchQuery)}&page=1&include_adult=false`;
           const res = await fetch(url);
           const data = await res.json();
-          setSearchResults(data.results || []);
-          setShowResults(true);
+          setSearchResults(data.results?.filter(m => m.poster_path || m.backdrop_path) || []);
         } catch (error) {
           console.error("Search failed", error);
+        } finally {
+          setIsSearching(false);
         }
       } else {
         setShowResults(false);
@@ -50,49 +60,24 @@ export default function Home() {
       }
     };
 
-    // Debounce search
-    const timeoutId = setTimeout(() => {
-      handleSearch();
-    }, 500);
-
+    const timeoutId = setTimeout(handleSearch, 500);
     return () => clearTimeout(timeoutId);
   }, [searchQuery]);
 
   const handleMovieClick = (movie, play = false) => {
     if (!movie) return;
-
-    // Determine type: explicitly set or infer
-    // Most TMDB results have 'media_type', otherwise guess based on props
-    let type = movie.media_type;
-    if (!type) {
-      if (movie.first_air_date || movie.name) {
-        type = 'tv';
-      } else {
-        type = 'movie';
-      }
-    }
-
+    let type = movie.media_type || (movie.first_air_date || movie.name ? 'tv' : 'movie');
     router.push(`/${type}/${movie.id}${play ? '?play=true' : ''}`);
   };
 
-  // Remove closeModal as it's no longer used for Modal
-
-
-  // Determine main trending row based on category
-  const getTrendingRow = () => {
-    if (category === "TV Shows") {
-      return { title: "Trending TV Shows", url: requests.fetchTrendingTV };
-    } else if (category === "Movies") {
-      return { title: "Trending Movies", url: requests.fetchTrendingMovies };
-    } else {
-      return { title: "Trending Now", url: requests.fetchTrending };
-    }
-  };
-
-  const trending = getTrendingRow();
+  const trendingConfig = useMemo(() => {
+    if (category === "TV Shows") return { title: "Trending TV Shows", url: requests.fetchTrendingTV };
+    if (category === "Movies") return { title: "Trending Movies", url: requests.fetchTrendingMovies };
+    return { title: "Trending Now", url: requests.fetchTrending };
+  }, [category]);
 
   return (
-    <div className="relative min-h-screen bg-[#141414] selection:bg-[#e50914] selection:text-white pb-10">
+    <div className="relative min-h-screen bg-netflix-black text-white selection:bg-netflix-red selection:text-white">
       <Nav
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
@@ -100,100 +85,115 @@ export default function Home() {
         currentCategory={category}
       />
 
-      {showResults ? (
-        <div className="pt-20 px-4 min-h-screen">
-          <h2 className="text-2xl font-bold text-white mb-4">Search Results</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {searchResults.map((movie) => (
-              (movie.poster_path || movie.backdrop_path) && (
-                <div
-                  key={movie.id}
-                  onClick={() => handleMovieClick(movie)}
-                  className="relative cursor-pointer transition-transform duration-300 hover:scale-105 group"
-                >
-                  <img
-                    className="rounded-md object-cover w-full h-auto aspect-[2/3]"
-                    src={`https://image.tmdb.org/t/p/original/${movie.poster_path || movie.backdrop_path}`}
-                    alt={movie.name}
-                  />
-                  <p className="mt-2 text-sm text-gray-300 truncate group-hover:text-white">
-                    {movie.title || movie.name || movie.original_name}
-                  </p>
+      <main className="pb-20">
+        {showResults ? (
+          <div className="pt-24 px-4 md:px-12 min-h-screen animate-in fade-in duration-500">
+            <h2 className="text-2xl font-bold mb-8 flex items-center gap-3">
+              {isSearching ? 'Searching...' : `Results for "${searchQuery}"`}
+              {isSearching && <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />}
+            </h2>
+            
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+              {isSearching ? (
+                [...Array(12)].map((_, i) => (
+                  <Skeleton key={i} className="aspect-[2/3] w-full" />
+                ))
+              ) : searchResults.length > 0 ? (
+                searchResults.map((movie) => (
+                  <div key={movie.id} className="relative aspect-[2/3]">
+                    <div
+                      onClick={() => handleMovieClick(movie)}
+                      className="group absolute inset-0 cursor-pointer transition-standard hover:scale-105 active:scale-95 z-10 hover:z-20"
+                    >
+                      <div className="w-full h-full overflow-hidden rounded-xl border-2 border-transparent group-hover:border-netflix-red shadow-soft group-hover:shadow-strong transition-standard bg-surface relative">
+                        <img
+                          className="w-full h-full object-cover transition-standard group-hover:brightness-50 group-hover:scale-105"
+                          src={`https://image.tmdb.org/t/p/w500/${movie.poster_path || movie.backdrop_path}`}
+                          alt={movie.title || movie.name}
+                          loading="lazy"
+                        />
+                        
+                        {/* Hover Overlay */}
+                        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-standard p-4 flex flex-col justify-end bg-gradient-to-t from-black via-black/20 to-transparent">
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <div className="flex items-center gap-1 bg-netflix-red text-white text-[10px] font-black px-1.5 py-0.5 rounded shadow-soft">
+                              <Star className="w-2.5 h-2.5 fill-current" />
+                              {movie.vote_average?.toFixed(1)}
+                            </div>
+                          </div>
+                          <h3 className="text-sm font-bold text-white line-clamp-2 leading-tight drop-shadow-md">
+                            {movie.title || movie.name}
+                          </h3>
+                          <p className="text-[10px] text-text-muted font-bold mt-1">
+                            {movie.release_date?.split('-')[0] || movie.first_air_date?.split('-')[0]}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="col-span-full text-center py-20">
+                  <p className="text-text-secondary text-lg font-medium">No results found for your search.</p>
+                  <button 
+                    onClick={() => setSearchQuery("")}
+                    className="mt-4 text-netflix-red hover:underline underline-offset-4"
+                  >
+                    Clear search
+                  </button>
                 </div>
-              )
-            ))}
+              )}
+            </div>
           </div>
-          {searchResults.length === 0 && <p className="text-white text-center mt-10">No results found.</p>}
-        </div>
-      ) : (
-        <>
-          <Banner onMovieClick={handleMovieClick} />
-          <div className="pl-4 pb-8 -mt-32 relative z-10 space-y-8">
-            {/* Continue Watching Row */}
-            {category === "Home" && continueWatching.length > 0 && (
+        ) : (
+          <div className="animate-in fade-in duration-700">
+            <Banner onMovieClick={handleMovieClick} />
+            
+            <div className="relative z-30 space-y-12 md:space-y-16 py-8">
+              {category === "Home" && continueWatching.length > 0 && (
+                <Row
+                  title="Continue Watching"
+                  data={continueWatching}
+                  onMovieClick={(movie) => handleMovieClick(movie, true)}
+                />
+              )}
+
               <Row
-                title="Continue Watching"
-                data={continueWatching}
-                onMovieClick={(movie) => handleMovieClick(movie, true)}
+                title={trendingConfig.title}
+                fetchUrl={trendingConfig.url}
+                isLargeRow
+                onMovieClick={handleMovieClick}
               />
-            )}
 
-            {/* Primary Large Row (Trending) */}
-            <Row
-              title={trending.title}
-              fetchUrl={trending.url}
-              isLargeRow
-              onMovieClick={handleMovieClick}
-            />
-
-            {/* TV Show Specific Rows */}
-            {category === "TV Shows" && (
-              <>
-                <Row title="Top Rated TV" fetchUrl={requests.fetchTopRatedTV} onMovieClick={handleMovieClick} />
-                <Row title="Action & Adventure" fetchUrl={requests.fetchActionTV} onMovieClick={handleMovieClick} />
-                <Row title="Comedy Series" fetchUrl={requests.fetchComedyTV} onMovieClick={handleMovieClick} />
-                <Row title="Docuseries" fetchUrl={requests.fetchDocTV} onMovieClick={handleMovieClick} />
-              </>
-            )}
-
-            {/* Movie/Home Specific Rows */}
-            {(category === "Movies" || category === "Home") && (
-              <>
-                <Row title="Top Rated" fetchUrl={requests.fetchTopRated} onMovieClick={handleMovieClick} />
-                <Row title="Action Movies" fetchUrl={requests.fetchActionMovies} onMovieClick={handleMovieClick} />
-                <Row title="Comedy Movies" fetchUrl={requests.fetchComedyMovies} onMovieClick={handleMovieClick} />
-                <Row title="Horror Movies" fetchUrl={requests.fetchHorrorMovies} onMovieClick={handleMovieClick} />
-                <Row title="Romance Movies" fetchUrl={requests.fetchRomanceMovies} onMovieClick={handleMovieClick} />
-                <Row title="Documentaries" fetchUrl={requests.fetchDocumentaries} onMovieClick={handleMovieClick} />
-              </>
-            )}
-
-            {(category === "Movies" || category === "Home") && (
-              <>
-                <Row title="Adventure" fetchUrl={requests.fetchAdventureMovies} onMovieClick={handleMovieClick} />
-                <Row title="Animation" fetchUrl={requests.fetchAnimationMovies} onMovieClick={handleMovieClick} />
-                <Row title="Crime" fetchUrl={requests.fetchCrimeMovies} onMovieClick={handleMovieClick} />
-                <Row title="Drama" fetchUrl={requests.fetchDramaMovies} onMovieClick={handleMovieClick} />
-                <Row title="Family" fetchUrl={requests.fetchFamilyMovies} onMovieClick={handleMovieClick} />
-                <Row title="Fantasy" fetchUrl={requests.fetchFantasyMovies} onMovieClick={handleMovieClick} />
-                <Row title="History" fetchUrl={requests.fetchHistoryMovies} onMovieClick={handleMovieClick} />
-                <Row title="Music" fetchUrl={requests.fetchMusicMovies} onMovieClick={handleMovieClick} />
-                <Row title="Mystery" fetchUrl={requests.fetchMysteryMovies} onMovieClick={handleMovieClick} />
-                <Row title="Sci-Fi" fetchUrl={requests.fetchSciFiMovies} onMovieClick={handleMovieClick} />
-                <Row title="Thriller" fetchUrl={requests.fetchThrillerMovies} onMovieClick={handleMovieClick} />
-                <Row title="War" fetchUrl={requests.fetchWarMovies} onMovieClick={handleMovieClick} />
-                <Row title="Western" fetchUrl={requests.fetchWesternMovies} onMovieClick={handleMovieClick} />
-              </>
-            )}
+              {category === "TV Shows" ? (
+                <>
+                  <Row title="Top Rated TV" fetchUrl={requests.fetchTopRatedTV} onMovieClick={handleMovieClick} />
+                  <Row title="Action & Adventure" fetchUrl={requests.fetchActionTV} onMovieClick={handleMovieClick} />
+                  <Row title="Comedy Series" fetchUrl={requests.fetchComedyTV} onMovieClick={handleMovieClick} />
+                  <Row title="Docuseries" fetchUrl={requests.fetchDocTV} onMovieClick={handleMovieClick} />
+                </>
+              ) : category === "Movies" ? (
+                <>
+                  <Row title="Top Rated" fetchUrl={requests.fetchTopRated} onMovieClick={handleMovieClick} />
+                  <Row title="Action Movies" fetchUrl={requests.fetchActionMovies} onMovieClick={handleMovieClick} />
+                  <Row title="Comedy Movies" fetchUrl={requests.fetchComedyMovies} onMovieClick={handleMovieClick} />
+                  <Row title="Horror Movies" fetchUrl={requests.fetchHorrorMovies} onMovieClick={handleMovieClick} />
+                  <Row title="Romance Movies" fetchUrl={requests.fetchRomanceMovies} onMovieClick={handleMovieClick} />
+                </>
+              ) : (
+                <>
+                  <Row title="Top Rated" fetchUrl={requests.fetchTopRated} onMovieClick={handleMovieClick} />
+                  <Row title="Action Movies" fetchUrl={requests.fetchActionMovies} onMovieClick={handleMovieClick} />
+                  <Row title="Documentaries" fetchUrl={requests.fetchDocumentaries} onMovieClick={handleMovieClick} />
+                  <Row title="Animation" fetchUrl={requests.fetchAnimationMovies} onMovieClick={handleMovieClick} />
+                </>
+              )}
+            </div>
           </div>
-        </>
-      )}
+        )}
+      </main>
 
-      {!showResults && (
-        <footer className='w-full text-center text-gray-500 text-sm py-10 opacity-60'>
-          <p>Built for educational purposes. Data provided by TMDB.</p>
-        </footer>
-      )}
+      {!showResults && <Footer />}
     </div>
   );
 }

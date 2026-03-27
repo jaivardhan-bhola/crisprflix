@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Nav from '../../components/Nav';
+import Footer from '../../components/Footer';
 import { VolumeX, Play, MapPin, X, Clock, ChevronRight, Flag } from 'lucide-react';
 import f1Servers from '../../f1.json';
 
@@ -477,6 +478,7 @@ export default function F1Page() {
                     to { opacity: 1; transform: scale(1) translateY(0); }
                 }
             `}</style>
+            <Footer />
         </div>
     );
 }
