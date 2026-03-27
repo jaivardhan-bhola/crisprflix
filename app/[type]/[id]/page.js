@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Nav from '../../../components/Nav';
+import Row from '../../../components/Row';
+import ReviewModal from '../../../components/ReviewModal';
 import { Plus, VolumeX, Star, Play, Info, Video } from 'lucide-react';
 import tvServers from '../../../tv.json';
 import movieServers from '../../../movie.json';
@@ -18,6 +20,9 @@ export default function Details() {
     const type = params.type; // 'movie' or 'tv'
 
     const [movie, setMovie] = useState(null);
+    const [recommendations, setRecommendations] = useState([]);
+    const [reviews, setReviews] = useState([]);
+    const [selectedReview, setSelectedReview] = useState(null);
     const [loading, setLoading] = useState(true);
     const [isPlaying, setIsPlaying] = useState(shouldPlay);
     const [selectedServer, setSelectedServer] = useState('Default');
@@ -212,6 +217,18 @@ export default function Details() {
                 const url = `https://api.themoviedb.org/3/${type}/${id}?api_key=${API_KEY}&language=en-US&append_to_response=videos,credits,external_ids`;
                 const res = await fetch(url);
                 const data = await res.json();
+
+                // Fetch Similar Movies/TV Shows
+                const recUrl = `https://api.themoviedb.org/3/${type}/${id}/similar?api_key=${API_KEY}&language=en-US`;
+                const recRes = await fetch(recUrl);
+                const recData = await recRes.json();
+                setRecommendations(recData.results || []);
+
+                // Fetch Reviews
+                const revUrl = `https://api.themoviedb.org/3/${type}/${id}/reviews?api_key=${API_KEY}&language=en-US`;
+                const revRes = await fetch(revUrl);
+                const revData = await revRes.json();
+                setReviews(revData.results || []);
 
                 if (data.success === false) {
                     setMovie(null); // Handle TMDB error
@@ -718,6 +735,70 @@ export default function Details() {
                                 </div>
                             )}
 
+                            {/* Recommendations Section */}
+                            {recommendations.length > 0 && (
+                                <div className="pt-12 border-t border-zinc-800">
+                                    <Row 
+                                        title="MORE LIKE THIS" 
+                                        data={recommendations.map(r => ({ ...r, media_type: type }))} 
+                                        onMovieClick={handleMovieClick}
+                                        titleClassName="text-xl font-black text-white uppercase tracking-tighter mb-8"
+                                        className="px-0"
+                                    />
+                                </div>
+                            )}
+
+                            {/* Reviews Section */}
+                            {reviews.length > 0 && (
+                                <div className="pt-12 border-t border-zinc-800">
+                                    <h2 className="text-xl font-black text-white uppercase tracking-tighter mb-8">Audience Reviews</h2>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                        {reviews.slice(0, 4).map((review) => (
+                                            <div key={review.id} className="bg-zinc-900/40 border border-zinc-800/50 p-6 rounded-2xl hover:bg-zinc-900/60 transition group">
+                                                <div className="flex items-center gap-4 mb-4">
+                                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-zinc-700 to-zinc-800 flex items-center justify-center text-zinc-400 font-bold uppercase overflow-hidden border border-zinc-700">
+                                                        {review.author_details?.avatar_path ? (
+                                                            <img 
+                                                                src={`https://image.tmdb.org/t/p/w45${review.author_details.avatar_path}`} 
+                                                                alt={review.author} 
+                                                                className="w-full h-full object-cover"
+                                                            />
+                                                        ) : (
+                                                            review.author[0]
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-white font-bold text-sm">{review.author}</p>
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="flex text-yellow-500 scale-75 -ml-1">
+                                                                {[...Array(5)].map((_, i) => (
+                                                                    <Star key={i} className={`w-3 h-3 ${i < Math.round((review.author_details?.rating || 0) / 2) ? 'fill-current' : 'opacity-20'}`} />
+                                                                ))}
+                                                            </div>
+                                                            <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">
+                                                                {new Date(review.created_at).toLocaleDateString()}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <p className="text-zinc-400 text-sm leading-relaxed line-clamp-4 italic group-hover:text-zinc-300 transition">
+                                                    "{review.content}"
+                                                </p>
+                                                {review.content.length > 300 && (
+                                                    <button 
+                                                        onClick={() => setSelectedReview(review)}
+                                                        className="mt-4 text-[10px] font-black text-[#e50914] uppercase tracking-widest hover:underline"
+                                                    >
+                                                        Read Full Review
+                                                    </button>
+                                                )}
+
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Trailers & Extras Section */}
                             {movie.videos?.results?.length > 1 && (
                                 <div className="pt-12 border-t border-zinc-800">
@@ -833,6 +914,13 @@ export default function Details() {
                 </>
             )}
 
+            {selectedReview && (
+                <ReviewModal 
+                    review={selectedReview} 
+                    onClose={() => setSelectedReview(null)} 
+                />
+            )}
         </div>
     );
 }
+

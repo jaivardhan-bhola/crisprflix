@@ -5,7 +5,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { getEpisodeProgress } from '../utils/continueWatching';
 
-function Row({ title, fetchUrl, data, isLargeRow = false, onMovieClick }) {
+function Row({ title, fetchUrl, data, isLargeRow = false, onMovieClick, titleClassName, className }) {
     const [movies, setMovies] = useState([]);
     const rowRef = useRef(null);
     const [isMoved, setIsMoved] = useState(false);
@@ -95,10 +95,12 @@ function Row({ title, fetchUrl, data, isLargeRow = false, onMovieClick }) {
 
 
     return (
-        <div className="space-y-0.5 md:space-y-2 px-4 group">
-            <h2 className="w-56 cursor-pointer text-sm font-semibold text-[#e5e5e5] transition duration-200 hover:text-white md:text-2xl">
-                {title}
-            </h2>
+        <div className={`space-y-0.5 md:space-y-2 ${className || "px-4"} group`}>
+            {title && (
+                <h2 className={titleClassName || "w-56 cursor-pointer text-sm font-semibold text-[#e5e5e5] transition duration-200 hover:text-white md:text-2xl"}>
+                    {title}
+                </h2>
+            )}
 
             <div className="relative md:-ml-2">
                 <ChevronLeft
