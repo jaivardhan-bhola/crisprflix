@@ -6,7 +6,7 @@ import Nav from '../../../components/Nav';
 import Row from '../../../components/Row';
 import ReviewModal from '../../../components/ReviewModal';
 import Skeleton from '../../../components/Skeleton';
-import { Plus, Star, Play, Info, Video, ChevronDown, Calendar, Globe, Building2, Languages, DollarSign, TrendingUp, Tv, Tag, Clapperboard, Quote, Sparkles } from 'lucide-react';
+import { Plus, Star, Play, Info, Video, ChevronDown, Calendar, Globe, Building2, Languages, DollarSign, TrendingUp, Tv, Tag, Clapperboard, Quote, Sparkles, Volume2, VolumeX } from 'lucide-react';
 import tvServers from '../../../tv.json';
 import movieServers from '../../../movie.json';
 import Footer from '../../../components/Footer';
@@ -35,9 +35,23 @@ function DetailsContent() {
     const [episodes, setEpisodes] = useState([]);
     const [episodeProgress, setEpisodeProgress] = useState({});
     const [playingTrailerKey, setPlayingTrailerKey] = useState(null);
+    const [isMuted, setIsMuted] = useState(true);
+    const [showTrailer, setShowTrailer] = useState(false);
 
-    // Safety check for params
-    if (!id || !type) return null;
+    // Load mute preference
+    useEffect(() => {
+        const savedMute = localStorage.getItem('crisprflix-muted');
+        if (savedMute !== null) {
+            setIsMuted(savedMute === 'true');
+        }
+    }, []);
+
+    const toggleMute = (e) => {
+        e.stopPropagation();
+        const newMuted = !isMuted;
+        setIsMuted(newMuted);
+        localStorage.setItem('crisprflix-muted', newMuted.toString());
+    };
 
     // Handle autoplay and clear query param
     useEffect(() => {
@@ -61,6 +75,14 @@ function DetailsContent() {
         }
     }, [shouldPlay, movie, loading, id, type, router, searchParams]);
 
+    // Delay trailer showing for smoother transition
+    useEffect(() => {
+        if (movie && !loading) {
+            const timer = setTimeout(() => setShowTrailer(true), 2000);
+            return () => clearTimeout(timer);
+        }
+    }, [movie, loading]);
+
     // Search State (Unified with Home)
     const [searchQuery, setSearchQuery] = useState("");
     const [searchResults, setSearchResults] = useState([]);
@@ -68,6 +90,9 @@ function DetailsContent() {
     const [showResults, setShowResults] = useState(false);
     const [showFullOverview, setShowFullOverview] = useState(false);
     const [showAllCast, setShowAllCast] = useState(false);
+
+    // Safety check for params
+    if (!id || !type) return null;
 
     const formatRuntime = (mins) => {
         if (!mins) return '';
@@ -266,11 +291,36 @@ function DetailsContent() {
                         <div className="absolute inset-0 z-10 bg-gradient-to-t from-netflix-black via-netflix-black/40 to-transparent" />
                         <div className="absolute inset-0 z-10 bg-gradient-to-r from-netflix-black via-netflix-black/30 to-transparent" />
                         
-                        <img
-                            src={`https://image.tmdb.org/t/p/original/${movie.backdrop_path || movie.poster_path}`}
-                            alt={movie.title || movie.name}
-                            className="w-full h-full object-cover animate-in fade-in duration-1000"
-                        />
+                        {showTrailer && trailer ? (
+                            <div className="absolute inset-0 w-full h-full scale-125 md:scale-110">
+                                <iframe
+                                    src={`https://www.youtube.com/embed/${trailer.key}?autoplay=1&mute=${isMuted ? 1 : 0}&controls=0&loop=1&playlist=${trailer.key}&rel=0&showinfo=0&iv_load_policy=3&modestbranding=1`}
+                                    className="w-full h-full pointer-events-none"
+                                    allow="autoplay; encrypted-media"
+                                    title="trailer"
+                                />
+                            </div>
+                        ) : (
+                            <img
+                                src={`https://image.tmdb.org/t/p/original/${movie.backdrop_path || movie.poster_path}`}
+                                alt={movie.title || movie.name}
+                                className="w-full h-full object-cover animate-in fade-in duration-1000"
+                            />
+                        )}
+
+                        {trailer && (
+                            <button
+                                onClick={toggleMute}
+                                className="absolute bottom-12 right-12 z-20 p-3 rounded-full border border-white/40 bg-black/40 backdrop-blur-md hover:bg-black/60 transition-all active:scale-95 group"
+                                aria-label={isMuted ? "Unmute" : "Mute"}
+                            >
+                                {isMuted ? (
+                                    <VolumeX className="w-6 h-6 text-white group-hover:scale-110 transition-fast" />
+                                ) : (
+                                    <Volume2 className="w-6 h-6 text-white group-hover:scale-110 transition-fast" />
+                                )}
+                            </button>
+                        )}
 
                         <div className="absolute bottom-0 left-0 w-full px-4 md:px-12 pb-12 z-20 max-w-4xl space-y-6">
                             <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight drop-shadow-2xl">
