@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Nav from '../../../components/Nav';
 import Skeleton from '../../../components/Skeleton';
 import Footer from '../../../components/Footer';
 import { Film, Tv, Star } from 'lucide-react';
 
-export default function KeywordPage() {
+function KeywordContent() {
     const params = useParams();
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -186,5 +186,17 @@ export default function KeywordPage() {
             </main>
             {!showResults && <Footer />}
         </div>
+    );
+}
+
+export default function KeywordPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-netflix-black flex items-center justify-center">
+                <div className="w-12 h-12 border-4 border-netflix-red border-t-transparent rounded-full animate-spin" />
+            </div>
+        }>
+            <KeywordContent />
+        </Suspense>
     );
 }

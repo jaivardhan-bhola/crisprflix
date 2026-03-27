@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, Suspense } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Nav from '../../../components/Nav';
 import Row from '../../../components/Row';
@@ -12,7 +12,7 @@ import movieServers from '../../../movie.json';
 import Footer from '../../../components/Footer';
 import { addToContinueWatching, getContinueWatching, getEpisodeProgress, updateEpisodeProgress } from '../../../utils/continueWatching';
 
-export default function Details() {
+function DetailsContent() {
     const params = useParams();
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -620,5 +620,17 @@ export default function Details() {
             {selectedReview && <ReviewModal review={selectedReview} onClose={() => setSelectedReview(null)} />}
             {!showResults && <Footer />}
         </div>
+    );
+}
+
+export default function Details() {
+    return (
+        <Suspense fallback={
+            <div className="h-screen w-full bg-netflix-black flex items-center justify-center">
+                <div className="w-12 h-12 border-4 border-white/10 border-t-netflix-red rounded-full animate-spin" />
+            </div>
+        }>
+            <DetailsContent />
+        </Suspense>
     );
 }

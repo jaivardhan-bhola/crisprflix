@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Nav from '../components/Nav';
 import Banner from '../components/Banner';
@@ -11,7 +11,7 @@ import Skeleton from '../components/Skeleton';
 import Footer from '../components/Footer';
 import { Star } from 'lucide-react';
 
-export default function Home() {
+function HomeContent() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
@@ -195,5 +195,17 @@ export default function Home() {
 
       {!showResults && <Footer />}
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-netflix-black flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-netflix-red border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <HomeContent />
+    </Suspense>
   );
 }
