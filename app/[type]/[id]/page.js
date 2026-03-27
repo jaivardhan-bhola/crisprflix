@@ -16,10 +16,11 @@ function DetailsContent() {
     const params = useParams();
     const router = useRouter();
     const searchParams = useSearchParams();
-    const shouldPlay = searchParams.get('play') === 'true';
     
-    const id = params.id;
-    const type = params.type;
+    const id = params?.id;
+    const type = params?.type;
+
+    const shouldPlay = searchParams.get('play') === 'true';
 
     const [movie, setMovie] = useState(null);
     const [recommendations, setRecommendations] = useState([]);
@@ -34,6 +35,9 @@ function DetailsContent() {
     const [episodes, setEpisodes] = useState([]);
     const [episodeProgress, setEpisodeProgress] = useState({});
     const [playingTrailerKey, setPlayingTrailerKey] = useState(null);
+
+    // Safety check for params
+    if (!id || !type) return null;
 
     // Handle autoplay and clear query param
     useEffect(() => {

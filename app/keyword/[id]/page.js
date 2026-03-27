@@ -12,7 +12,9 @@ function KeywordContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     
-    const id = params.id;
+    const id = params?.id;
+    if (!id) return null;
+
     const keywordName = searchParams.get('name') || 'Keyword';
     const initialType = searchParams.get('type') || 'movie';
 
