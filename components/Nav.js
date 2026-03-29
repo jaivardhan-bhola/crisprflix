@@ -25,6 +25,10 @@ function Nav({ searchQuery, setSearchQuery, setCategory, currentCategory }) {
     }, []);
 
     const handleNavLinkClick = (value) => {
+        if (value === 'Formula 1') {
+            router.push('/f1');
+            return;
+        }
         if (setCategory && pathname === '/') {
             setCategory(value);
         } else {
@@ -37,6 +41,7 @@ function Nav({ searchQuery, setSearchQuery, setCategory, currentCategory }) {
         { name: 'Home', value: 'Home' },
         { name: 'TV Shows', value: 'TV Shows' },
         { name: 'Movies', value: 'Movies' },
+        { name: 'Formula 1', value: 'Formula 1' },
     ];
 
     return (
