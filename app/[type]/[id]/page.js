@@ -37,8 +37,6 @@ function DetailsContent() {
     const [playingTrailerKey, setPlayingTrailerKey] = useState(null);
     const [isMuted, setIsMuted] = useState(true);
     const [showTrailer, setShowTrailer] = useState(false);
-    const [showNextEpisode, setShowNextEpisode] = useState(false);
-    const [nextEpisodeCountdown, setNextEpisodeCountdown] = useState(15);
 
     // Load mute preference
     useEffect(() => {
@@ -153,66 +151,6 @@ function DetailsContent() {
         return () => window.removeEventListener('episodeProgressUpdated', handleProgressUpdated);
     }, [id]);
 
-    // Show next-episode button ~30s before the episode ends
-    useEffect(() => {
-        if (!isPlaying || type !== 'tv' || !episodes.length || !movie) {
-            setShowNextEpisode(false);
-            return;
-        }
-        const hasNext = episodes.some(e => e.episode_number > episode);
-        if (!hasNext) { setShowNextEpisode(false); return; }
-        setShowNextEpisode(false);
-        setNextEpisodeCountdown(15);
-
-        const currentEp = episodes.find(e => e.episode_number === episode);
-        const runtimeSecs = (currentEp?.runtime || movie.episode_run_time?.[0] || 45) * 60;
-        const progKey = `s${season}e${episode}`;
-        const existingProgress = episodeProgress[progKey] || 0;
-        let elapsed = Math.floor((existingProgress / 100) * runtimeSecs);
-        const showAtSecs = Math.max(runtimeSecs - 30, 0);
-
-        if (elapsed >= showAtSecs) { setShowNextEpisode(true); return; }
-
-        const timer = setInterval(() => {
-            elapsed += 1;
-            if (elapsed >= showAtSecs) {
-                setShowNextEpisode(true);
-                clearInterval(timer);
-            }
-        }, 1000);
-        return () => clearInterval(timer);
-    }, [isPlaying, episode, season, episodes, movie]);
-
-    // Countdown then auto-advance
-    useEffect(() => {
-        if (!showNextEpisode) { setNextEpisodeCountdown(15); return; }
-        let count = 15;
-        setNextEpisodeCountdown(15);
-        const timer = setInterval(() => {
-            count -= 1;
-            setNextEpisodeCountdown(count);
-            if (count <= 0) {
-                clearInterval(timer);
-                const nextEp = episodes.filter(e => e.episode_number > episode).sort((a, b) => a.episode_number - b.episode_number)[0];
-                if (nextEp) {
-                    setEpisode(nextEp.episode_number);
-                    const m = nextEp.runtime ? { ...movie, lastWatchedEpisodeRuntime: nextEp.runtime } : movie;
-                    addToContinueWatching(m, season, nextEp.episode_number, selectedServer);
-                } else {
-                    const nextSeason = movie.seasons
-                        ?.filter(s => s.season_number > season)
-                        .sort((a, b) => a.season_number - b.season_number)[0];
-                    if (nextSeason) {
-                        fetchSeasonDetails(nextSeason.season_number, 1);
-                        addToContinueWatching(movie, nextSeason.season_number, 1, selectedServer);
-                    }
-                }
-                setShowNextEpisode(false);
-                setNextEpisodeCountdown(15);
-            }
-        }, 1000);
-        return () => clearInterval(timer);
-    }, [showNextEpisode, episodes, episode, season, movie, selectedServer]);
 
     useEffect(() => {
         if (type !== 'movie' && type !== 'tv') {
@@ -322,25 +260,6 @@ function DetailsContent() {
     const seekEpisodeRef = useRef(seekEpisode);
     useEffect(() => { seekEpisodeRef.current = seekEpisode; });
 
-    // Advance to the next episode (or next season's E1) — unified for button click + postMessage
-    const handleNextEpisode = () => {
-        const nextEp = episodes.filter(e => e.episode_number > episode).sort((a, b) => a.episode_number - b.episode_number)[0];
-        if (nextEp) {
-            seekEpisode(season, nextEp.episode_number);
-        } else {
-            // End of season — jump to next season E1
-            const nextSeason = movie.seasons
-                ?.filter(s => s.season_number > season)
-                .sort((a, b) => a.season_number - b.season_number)[0];
-            if (nextSeason) seekEpisode(nextSeason.season_number, 1);
-        }
-        setShowNextEpisode(false);
-        setNextEpisodeCountdown(15);
-    };
-
-    const handleNextEpisodeRef = useRef(handleNextEpisode);
-    useEffect(() => { handleNextEpisodeRef.current = handleNextEpisode; });
-
     // Listen for next-episode events from embedded players
     useEffect(() => {
         if (!isPlaying || type !== 'tv') return;
@@ -355,7 +274,6 @@ function DetailsContent() {
                 const data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
                 if (!data) return;
 
-                // Consecutive NEXT_EPISODE_AVAILABLE pattern
                 if (data.type === 'NEXT_EPISODE_AVAILABLE' && data.data?.season && data.data?.episode) {
                     const { season: s, episode: ep } = data.data;
                     if (prevSuggestion) {
@@ -368,13 +286,16 @@ function DetailsContent() {
                     return;
                 }
 
-                // Generic next-episode events from other players
                 const isNext =
                     data.event === 'nextEpisode' || data.event === 'next_episode' ||
                     data.type  === 'nextEpisode' || data.type  === 'next_episode' ||
                     data.name  === 'nextEpisode' || data.action === 'nextEpisode' ||
                     data.event === 'NEXT_EPISODE' || data.type  === 'NEXT_EPISODE';
-                if (isNext) handleNextEpisodeRef.current();
+                if (isNext) {
+                    const curSeason = seasonRef.current;
+                    const curEp = episodeRef.current;
+                    seekEpisodeRef.current(curSeason, curEp + 1);
+                }
             } catch {}
         };
         window.addEventListener('message', handler);
@@ -826,42 +747,6 @@ function DetailsContent() {
                     </div>
                     <iframe key={`${selectedServer}-${season}-${episode}`} src={(type === 'movie' ? movieServers : tvServers)[selectedServer].replace('{tmdbId}', id).replace('{season}', season).replace('{episode}', episode)} className="w-full h-full" allowFullScreen allow="autoplay" />
 
-                    {showNextEpisode && (() => {
-                        const nextEp = episodes.filter(e => e.episode_number > episode).sort((a, b) => a.episode_number - b.episode_number)[0];
-                        const circumference = 2 * Math.PI * 20;
-                        return (
-                            <div className="absolute bottom-16 right-8 z-20 flex flex-col items-end gap-2 animate-in slide-in-from-right-4 fade-in duration-300">
-                                <button
-                                    onClick={handleNextEpisode}
-                                    className="flex items-center gap-4 bg-white text-black px-5 py-3 rounded-xl font-bold hover:bg-gray-100 transition-fast active:scale-95 shadow-2xl"
-                                >
-                                    <div className="text-left">
-                                        <p className="text-[10px] uppercase tracking-widest text-black/50 font-black">Next Episode</p>
-                                        <p className="text-sm font-black leading-tight">{nextEp ? `Ep ${nextEp.episode_number}${nextEp.name ? ` • ${nextEp.name}` : ''}` : ''}</p>
-                                    </div>
-                                    <div className="relative w-11 h-11 flex items-center justify-center shrink-0">
-                                        <svg className="absolute inset-0 -rotate-90" viewBox="0 0 44 44">
-                                            <circle cx="22" cy="22" r="20" fill="none" stroke="rgba(0,0,0,0.15)" strokeWidth="3" />
-                                            <circle
-                                                cx="22" cy="22" r="20"
-                                                fill="none" stroke="black" strokeWidth="3"
-                                                strokeDasharray={circumference}
-                                                strokeDashoffset={circumference * (1 - nextEpisodeCountdown / 15)}
-                                                strokeLinecap="round"
-                                            />
-                                        </svg>
-                                        <span className="text-sm font-black relative z-10">{nextEpisodeCountdown}</span>
-                                    </div>
-                                </button>
-                                <button
-                                    onClick={() => setShowNextEpisode(false)}
-                                    className="text-white/50 text-xs hover:text-white transition-fast px-1"
-                                >
-                                    Dismiss
-                                </button>
-                            </div>
-                        );
-                    })()}
                 </div>
             )}
 
