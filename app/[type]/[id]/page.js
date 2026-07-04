@@ -37,6 +37,8 @@ function DetailsContent() {
     const [playingTrailerKey, setPlayingTrailerKey] = useState(null);
     const [isMuted, setIsMuted] = useState(true);
     const [showTrailer, setShowTrailer] = useState(false);
+    const [showPlayerControls, setShowPlayerControls] = useState(true);
+    const hideControlsTimer = useRef(null);
 
     // Load mute preference
     useEffect(() => {
@@ -724,7 +726,17 @@ function DetailsContent() {
 
             {isPlaying && (
                 <div className="fixed inset-0 z-50 bg-black flex flex-col animate-in fade-in duration-300">
-                    <div className="absolute top-0 left-0 w-full p-4 flex items-center justify-between z-10 bg-gradient-to-b from-black/80 to-transparent">
+                    {/* Invisible top-left hotspot — hover here to reveal controls */}
+                    <div
+                        className="absolute top-0 left-0 w-48 h-16 z-20"
+                        onMouseEnter={() => { clearTimeout(hideControlsTimer.current); setShowPlayerControls(true); }}
+                        onMouseLeave={() => { hideControlsTimer.current = setTimeout(() => setShowPlayerControls(false), 400); }}
+                    />
+                    <div
+                        className={`absolute top-0 left-0 w-full p-4 flex items-center justify-between z-10 bg-gradient-to-b from-black/80 to-transparent transition-opacity duration-300 ${showPlayerControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                        onMouseEnter={() => { clearTimeout(hideControlsTimer.current); setShowPlayerControls(true); }}
+                        onMouseLeave={() => { hideControlsTimer.current = setTimeout(() => setShowPlayerControls(false), 400); }}
+                    >
                         <button onClick={() => setIsPlaying(false)} className="flex items-center gap-2 text-white hover:text-gray-300 transition-fast">
                             <Plus className="w-8 h-8 rotate-45" />
                             <span className="font-bold">Back</span>
