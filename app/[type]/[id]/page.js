@@ -156,15 +156,12 @@ function DetailsContent() {
             setShowNextEpisode(false);
             return;
         }
-        const currentEpIndex = episodes.findIndex(e => e.episode_number === episode);
-        if (currentEpIndex === -1 || currentEpIndex === episodes.length - 1) {
-            setShowNextEpisode(false);
-            return;
-        }
+        const hasNext = episodes.some(e => e.episode_number > episode);
+        if (!hasNext) { setShowNextEpisode(false); return; }
         setShowNextEpisode(false);
         setNextEpisodeCountdown(15);
 
-        const currentEp = episodes[currentEpIndex];
+        const currentEp = episodes.find(e => e.episode_number === episode);
         const runtimeSecs = (currentEp?.runtime || movie.episode_run_time?.[0] || 45) * 60;
         const progKey = `s${season}e${episode}`;
         const existingProgress = episodeProgress[progKey] || 0;
@@ -193,9 +190,8 @@ function DetailsContent() {
             setNextEpisodeCountdown(count);
             if (count <= 0) {
                 clearInterval(timer);
-                const currentIndex = episodes.findIndex(e => e.episode_number === episode);
-                if (currentIndex !== -1 && currentIndex < episodes.length - 1) {
-                    const nextEp = episodes[currentIndex + 1];
+                const nextEp = episodes.filter(e => e.episode_number > episode).sort((a, b) => a.episode_number - b.episode_number)[0];
+                if (nextEp) {
                     setEpisode(nextEp.episode_number);
                     addToContinueWatching(movie, season, nextEp.episode_number, selectedServer);
                 }
@@ -284,9 +280,8 @@ function DetailsContent() {
     };
 
     const handleNextEpisode = () => {
-        const currentIndex = episodes.findIndex(e => e.episode_number === episode);
-        if (currentIndex !== -1 && currentIndex < episodes.length - 1) {
-            const nextEp = episodes[currentIndex + 1];
+        const nextEp = episodes.filter(e => e.episode_number > episode).sort((a, b) => a.episode_number - b.episode_number)[0];
+        if (nextEp) {
             setEpisode(nextEp.episode_number);
             addToContinueWatching(movie, season, nextEp.episode_number, selectedServer);
         }
@@ -737,7 +732,7 @@ function DetailsContent() {
                             )}
                         </div>
                     </div>
-                    <iframe src={(type === 'movie' ? movieServers : tvServers)[selectedServer].replace('{tmdbId}', id).replace('{season}', season).replace('{episode}', episode)} className="w-full h-full" allowFullScreen allow="autoplay" />
+                    <iframe key={`${selectedServer}-${season}-${episode}`} src={(type === 'movie' ? movieServers : tvServers)[selectedServer].replace('{tmdbId}', id).replace('{season}', season).replace('{episode}', episode)} className="w-full h-full" allowFullScreen allow="autoplay" />
 
                     {showNextEpisode && (() => {
                         const nextEp = episodes[episodes.findIndex(e => e.episode_number === episode) + 1];
