@@ -735,7 +735,7 @@ function DetailsContent() {
                     <iframe key={`${selectedServer}-${season}-${episode}`} src={(type === 'movie' ? movieServers : tvServers)[selectedServer].replace('{tmdbId}', id).replace('{season}', season).replace('{episode}', episode)} className="w-full h-full" allowFullScreen allow="autoplay" />
 
                     {showNextEpisode && (() => {
-                        const nextEp = episodes[episodes.findIndex(e => e.episode_number === episode) + 1];
+                        const nextEp = episodes.filter(e => e.episode_number > episode).sort((a, b) => a.episode_number - b.episode_number)[0];
                         const circumference = 2 * Math.PI * 20;
                         return (
                             <div className="absolute bottom-16 right-8 z-20 flex flex-col items-end gap-2 animate-in slide-in-from-right-4 fade-in duration-300">
