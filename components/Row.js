@@ -80,7 +80,9 @@ function Row({ title, fetchUrl, data, isLargeRow = false, onMovieClick, classNam
         const progress = progressData[progressKey];
         if (progress > 0 && progress < 90) {
             const mType = movie.media_type || (movie.first_air_date ? 'tv' : 'movie');
-            const runtime = mType === 'movie' ? movie.runtime : (movie.episode_run_time?.[0] || 45);
+            const runtime = mType === 'movie'
+                ? movie.runtime
+                : (movie.lastWatchedEpisodeRuntime || movie.episode_run_time?.[0]);
             if (runtime) {
                 const minsLeft = Math.round(runtime * (1 - progress / 100));
                 return minsLeft > 0 ? formatRuntime(minsLeft) : null;

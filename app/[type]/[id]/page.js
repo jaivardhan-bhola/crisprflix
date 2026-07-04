@@ -108,7 +108,10 @@ function DetailsContent() {
         const key = type === 'tv' ? `s${season}e${episode}` : 'movie';
         const progress = episodeProgress[key];
         if (progress > 0 && progress < 90) {
-            const runtime = type === 'movie' ? movie.runtime : (movie.episode_run_time?.[0] || 45);
+            const currentEp = type === 'tv' ? episodes.find(e => e.episode_number === episode) : null;
+            const runtime = type === 'movie'
+                ? movie.runtime
+                : (currentEp?.runtime || movie.episode_run_time?.[0]);
             if (runtime) {
                 const minsLeft = Math.round(runtime * (1 - progress / 100));
                 return minsLeft > 0 ? formatRuntime(minsLeft) : null;
@@ -193,7 +196,8 @@ function DetailsContent() {
                 const nextEp = episodes.filter(e => e.episode_number > episode).sort((a, b) => a.episode_number - b.episode_number)[0];
                 if (nextEp) {
                     setEpisode(nextEp.episode_number);
-                    addToContinueWatching(movie, season, nextEp.episode_number, selectedServer);
+                    const m = nextEp.runtime ? { ...movie, lastWatchedEpisodeRuntime: nextEp.runtime } : movie;
+                    addToContinueWatching(m, season, nextEp.episode_number, selectedServer);
                 }
                 setShowNextEpisode(false);
                 setNextEpisodeCountdown(15);
@@ -279,34 +283,78 @@ function DetailsContent() {
         }
     };
 
+    // Wrapper that stores per-episode runtime so Row.js can show accurate "time left"
+    const saveProgress = (epSeason, epNum, epRuntime) => {
+        const m = epRuntime ? { ...movie, lastWatchedEpisodeRuntime: epRuntime } : movie;
+        addToContinueWatching(m, epSeason, epNum, selectedServer);
+    };
+
     const handleNextEpisode = () => {
         const nextEp = episodes.filter(e => e.episode_number > episode).sort((a, b) => a.episode_number - b.episode_number)[0];
         if (nextEp) {
             setEpisode(nextEp.episode_number);
-            addToContinueWatching(movie, season, nextEp.episode_number, selectedServer);
+            saveProgress(season, nextEp.episode_number, nextEp.runtime);
         }
         setShowNextEpisode(false);
         setNextEpisodeCountdown(15);
     };
 
-    // Keep a ref so the postMessage handler always calls the latest handleNextEpisode
+    // Always-fresh refs to avoid stale closures in event handlers
     const handleNextEpisodeRef = useRef(handleNextEpisode);
     useEffect(() => { handleNextEpisodeRef.current = handleNextEpisode; });
 
-    // Listen for next-episode events from embedded players (videasy, vidsrc, etc.)
+    const seasonRef = useRef(season);
+    const episodeRef = useRef(episode);
+    useEffect(() => { seasonRef.current = season; }, [season]);
+    useEffect(() => { episodeRef.current = episode; }, [episode]);
+
+    // Navigate to a specific season/episode and persist to storage
+    const seekEpisode = (newSeason, newEp) => {
+        const curSeason = seasonRef.current;
+        const curEp = episodeRef.current;
+        // Only advance — never go backwards
+        if (newSeason < curSeason || (newSeason === curSeason && newEp <= curEp)) return;
+        if (newSeason !== curSeason) {
+            fetchSeasonDetails(newSeason, newEp);
+        } else {
+            setEpisode(newEp);
+        }
+        const epRuntime = newSeason === seasonRef.current
+            ? episodes.find(e => e.episode_number === newEp)?.runtime
+            : undefined;
+        saveProgress(newSeason, newEp, epRuntime);
+    };
+    const seekEpisodeRef = useRef(seekEpisode);
+    useEffect(() => { seekEpisodeRef.current = seekEpisode; });
+
+    // Listen for next-episode events from embedded players (vidfast, vidsrc, videasy, etc.)
     useEffect(() => {
         if (!isPlaying || type !== 'tv') return;
+        // vidfast sends NEXT_EPISODE_AVAILABLE twice:
+        //   1st fire  = player is suggesting episode X as "up next"
+        //   2nd fire  = player advanced; the 1st suggestion is now current
+        // Track the last suggestion so we can advance on the 2nd fire.
+        let prevSuggestion = null;
+
         const handler = (e) => {
-            // Store every message to localStorage so it can be inspected after opening DevTools
             try {
-                const log = JSON.parse(localStorage.getItem('crisprflix_pmsg') || '[]');
-                log.push({ origin: e.origin, data: e.data, t: Date.now() });
-                localStorage.setItem('crisprflix_pmsg', JSON.stringify(log.slice(-30)));
-            } catch {}
-            try {
-                const raw = e.data;
-                const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                const data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
                 if (!data) return;
+
+                // vidfast.pro — consecutive NEXT_EPISODE_AVAILABLE signals an advance
+                if (data.type === 'NEXT_EPISODE_AVAILABLE' && data.data?.season && data.data?.episode) {
+                    const { season: s, episode: ep } = data.data;
+                    if (prevSuggestion) {
+                        const advanced =
+                            s > prevSuggestion.season ||
+                            (s === prevSuggestion.season && ep > prevSuggestion.episode);
+                        if (advanced) seekEpisodeRef.current(prevSuggestion.season, prevSuggestion.episode);
+                    }
+                    prevSuggestion = { season: s, episode: ep };
+                    return;
+                }
+
+                // Generic next-episode events from other players
                 const isNext =
                     data.event === 'nextEpisode' || data.event === 'next_episode' ||
                     data.type  === 'nextEpisode' || data.type  === 'next_episode' ||
@@ -516,7 +564,7 @@ function DetailsContent() {
                                     {episodes.map((ep) => (
                                         <div
                                             key={ep.id}
-                                            onClick={() => { setEpisode(ep.episode_number); setIsPlaying(true); addToContinueWatching(movie, season, ep.episode_number, selectedServer); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                                            onClick={() => { setEpisode(ep.episode_number); setIsPlaying(true); addToContinueWatching(ep.runtime ? { ...movie, lastWatchedEpisodeRuntime: ep.runtime } : movie, season, ep.episode_number, selectedServer); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                                             className="flex flex-col md:flex-row items-center gap-6 p-4 bg-surface/30 hover:bg-surface/60 transition-standard rounded-xl cursor-pointer group border border-transparent hover:border-white/10"
                                         >
                                             <span className="text-2xl font-black text-text-muted w-8 text-center group-hover:text-white transition-fast">{ep.episode_number}</span>
@@ -755,7 +803,7 @@ function DetailsContent() {
                                     <select value={season} onChange={(e) => fetchSeasonDetails(parseInt(e.target.value))} className="bg-black/60 text-white text-xs border border-white/20 rounded px-3 py-1.5 outline-none focus:border-netflix-red hover:bg-black/80 transition-fast">
                                         {movie.seasons?.filter(s => s.season_number > 0).map(s => <option key={s.id} value={s.season_number}>Season {s.season_number}</option>)}
                                     </select>
-                                    <select value={episode} onChange={(e) => { const ep = parseInt(e.target.value); setEpisode(ep); addToContinueWatching(movie, season, ep, selectedServer); }} className="bg-black/60 text-white text-xs border border-white/20 rounded px-3 py-1.5 outline-none focus:border-netflix-red hover:bg-black/80 transition-fast">
+                                    <select value={episode} onChange={(e) => { const epNum = parseInt(e.target.value); const epObj = episodes.find(x => x.episode_number === epNum); setEpisode(epNum); addToContinueWatching(epObj?.runtime ? { ...movie, lastWatchedEpisodeRuntime: epObj.runtime } : movie, season, epNum, selectedServer); }} className="bg-black/60 text-white text-xs border border-white/20 rounded px-3 py-1.5 outline-none focus:border-netflix-red hover:bg-black/80 transition-fast">
                                         {episodes.map(e => <option key={e.id} value={e.episode_number}>Ep {e.episode_number}</option>)}
                                     </select>
                                 </>
