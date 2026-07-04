@@ -280,7 +280,9 @@ function DetailsContent() {
     };
 
     const handleNextEpisode = () => {
+        console.log('[CrisprFlix] handleNextEpisode — episode:', episode, 'episodes:', episodes.map(e => e.episode_number));
         const nextEp = episodes.filter(e => e.episode_number > episode).sort((a, b) => a.episode_number - b.episode_number)[0];
+        console.log('[CrisprFlix] nextEp resolved:', nextEp?.episode_number ?? 'NONE');
         if (nextEp) {
             setEpisode(nextEp.episode_number);
             addToContinueWatching(movie, season, nextEp.episode_number, selectedServer);
@@ -297,15 +299,21 @@ function DetailsContent() {
     useEffect(() => {
         if (!isPlaying || type !== 'tv') return;
         const handler = (e) => {
+            // Log every message so we can identify the exact format
+            console.log('[CrisprFlix] postMessage from', e.origin, ':', e.data);
             try {
-                const data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
+                const raw = e.data;
+                const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
                 if (!data) return;
                 const isNext =
                     data.event === 'nextEpisode' || data.event === 'next_episode' ||
                     data.type  === 'nextEpisode' || data.type  === 'next_episode' ||
                     data.name  === 'nextEpisode' || data.action === 'nextEpisode' ||
                     data.event === 'NEXT_EPISODE' || data.type  === 'NEXT_EPISODE';
-                if (isNext) handleNextEpisodeRef.current();
+                if (isNext) {
+                    console.log('[CrisprFlix] next-episode event matched:', data);
+                    handleNextEpisodeRef.current();
+                }
             } catch {}
         };
         window.addEventListener('message', handler);
@@ -751,11 +759,6 @@ function DetailsContent() {
                                     <select value={episode} onChange={(e) => { const ep = parseInt(e.target.value); setEpisode(ep); addToContinueWatching(movie, season, ep, selectedServer); }} className="bg-black/60 text-white text-xs border border-white/20 rounded px-3 py-1.5 outline-none focus:border-netflix-red hover:bg-black/80 transition-fast">
                                         {episodes.map(e => <option key={e.id} value={e.episode_number}>Ep {e.episode_number}</option>)}
                                     </select>
-                                    {episodes.some(e => e.episode_number > episode) && (
-                                        <button onClick={handleNextEpisode} className="bg-white text-black text-xs font-bold rounded px-3 py-1.5 hover:bg-gray-200 transition-fast active:scale-95 whitespace-nowrap">
-                                            Next Ep ›
-                                        </button>
-                                    )}
                                 </>
                             )}
                         </div>
