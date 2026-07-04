@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useMemo, Suspense } from 'react';
+import React, { useEffect, useState, useMemo, useRef, Suspense } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Nav from '../../../components/Nav';
 import Row from '../../../components/Row';
@@ -288,6 +288,29 @@ function DetailsContent() {
         setShowNextEpisode(false);
         setNextEpisodeCountdown(15);
     };
+
+    // Keep a ref so the postMessage handler always calls the latest handleNextEpisode
+    const handleNextEpisodeRef = useRef(handleNextEpisode);
+    useEffect(() => { handleNextEpisodeRef.current = handleNextEpisode; });
+
+    // Listen for next-episode events from embedded players (videasy, vidsrc, etc.)
+    useEffect(() => {
+        if (!isPlaying || type !== 'tv') return;
+        const handler = (e) => {
+            try {
+                const data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
+                if (!data) return;
+                const isNext =
+                    data.event === 'nextEpisode' || data.event === 'next_episode' ||
+                    data.type  === 'nextEpisode' || data.type  === 'next_episode' ||
+                    data.name  === 'nextEpisode' || data.action === 'nextEpisode' ||
+                    data.event === 'NEXT_EPISODE' || data.type  === 'NEXT_EPISODE';
+                if (isNext) handleNextEpisodeRef.current();
+            } catch {}
+        };
+        window.addEventListener('message', handler);
+        return () => window.removeEventListener('message', handler);
+    }, [isPlaying, type]);
 
     const trailer = useMemo(() => 
         movie?.videos?.results?.find(v => v.type === 'Trailer' && v.site === 'YouTube') || 
