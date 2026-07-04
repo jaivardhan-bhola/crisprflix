@@ -280,9 +280,7 @@ function DetailsContent() {
     };
 
     const handleNextEpisode = () => {
-        console.log('[CrisprFlix] handleNextEpisode — episode:', episode, 'episodes:', episodes.map(e => e.episode_number));
         const nextEp = episodes.filter(e => e.episode_number > episode).sort((a, b) => a.episode_number - b.episode_number)[0];
-        console.log('[CrisprFlix] nextEp resolved:', nextEp?.episode_number ?? 'NONE');
         if (nextEp) {
             setEpisode(nextEp.episode_number);
             addToContinueWatching(movie, season, nextEp.episode_number, selectedServer);
@@ -299,8 +297,12 @@ function DetailsContent() {
     useEffect(() => {
         if (!isPlaying || type !== 'tv') return;
         const handler = (e) => {
-            // Log every message so we can identify the exact format
-            console.log('[CrisprFlix] postMessage from', e.origin, ':', e.data);
+            // Store every message to localStorage so it can be inspected after opening DevTools
+            try {
+                const log = JSON.parse(localStorage.getItem('crisprflix_pmsg') || '[]');
+                log.push({ origin: e.origin, data: e.data, t: Date.now() });
+                localStorage.setItem('crisprflix_pmsg', JSON.stringify(log.slice(-30)));
+            } catch {}
             try {
                 const raw = e.data;
                 const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
@@ -310,10 +312,7 @@ function DetailsContent() {
                     data.type  === 'nextEpisode' || data.type  === 'next_episode' ||
                     data.name  === 'nextEpisode' || data.action === 'nextEpisode' ||
                     data.event === 'NEXT_EPISODE' || data.type  === 'NEXT_EPISODE';
-                if (isNext) {
-                    console.log('[CrisprFlix] next-episode event matched:', data);
-                    handleNextEpisodeRef.current();
-                }
+                if (isNext) handleNextEpisodeRef.current();
             } catch {}
         };
         window.addEventListener('message', handler);
