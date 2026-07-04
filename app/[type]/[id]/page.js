@@ -751,6 +751,11 @@ function DetailsContent() {
                                     <select value={episode} onChange={(e) => { const ep = parseInt(e.target.value); setEpisode(ep); addToContinueWatching(movie, season, ep, selectedServer); }} className="bg-black/60 text-white text-xs border border-white/20 rounded px-3 py-1.5 outline-none focus:border-netflix-red hover:bg-black/80 transition-fast">
                                         {episodes.map(e => <option key={e.id} value={e.episode_number}>Ep {e.episode_number}</option>)}
                                     </select>
+                                    {episodes.some(e => e.episode_number > episode) && (
+                                        <button onClick={handleNextEpisode} className="bg-white text-black text-xs font-bold rounded px-3 py-1.5 hover:bg-gray-200 transition-fast active:scale-95 whitespace-nowrap">
+                                            Next Ep ›
+                                        </button>
+                                    )}
                                 </>
                             )}
                         </div>
