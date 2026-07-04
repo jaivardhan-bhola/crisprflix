@@ -198,6 +198,14 @@ function DetailsContent() {
                     setEpisode(nextEp.episode_number);
                     const m = nextEp.runtime ? { ...movie, lastWatchedEpisodeRuntime: nextEp.runtime } : movie;
                     addToContinueWatching(m, season, nextEp.episode_number, selectedServer);
+                } else {
+                    const nextSeason = movie.seasons
+                        ?.filter(s => s.season_number > season)
+                        .sort((a, b) => a.season_number - b.season_number)[0];
+                    if (nextSeason) {
+                        fetchSeasonDetails(nextSeason.season_number, 1);
+                        addToContinueWatching(movie, nextSeason.season_number, 1, selectedServer);
+                    }
                 }
                 setShowNextEpisode(false);
                 setNextEpisodeCountdown(15);
@@ -289,20 +297,7 @@ function DetailsContent() {
         addToContinueWatching(m, epSeason, epNum, selectedServer);
     };
 
-    const handleNextEpisode = () => {
-        const nextEp = episodes.filter(e => e.episode_number > episode).sort((a, b) => a.episode_number - b.episode_number)[0];
-        if (nextEp) {
-            setEpisode(nextEp.episode_number);
-            saveProgress(season, nextEp.episode_number, nextEp.runtime);
-        }
-        setShowNextEpisode(false);
-        setNextEpisodeCountdown(15);
-    };
-
     // Always-fresh refs to avoid stale closures in event handlers
-    const handleNextEpisodeRef = useRef(handleNextEpisode);
-    useEffect(() => { handleNextEpisodeRef.current = handleNextEpisode; });
-
     const seasonRef = useRef(season);
     const episodeRef = useRef(episode);
     useEffect(() => { seasonRef.current = season; }, [season]);
@@ -319,7 +314,7 @@ function DetailsContent() {
         } else {
             setEpisode(newEp);
         }
-        const epRuntime = newSeason === seasonRef.current
+        const epRuntime = newSeason === curSeason
             ? episodes.find(e => e.episode_number === newEp)?.runtime
             : undefined;
         saveProgress(newSeason, newEp, epRuntime);
@@ -327,13 +322,32 @@ function DetailsContent() {
     const seekEpisodeRef = useRef(seekEpisode);
     useEffect(() => { seekEpisodeRef.current = seekEpisode; });
 
-    // Listen for next-episode events from embedded players (vidfast, vidsrc, videasy, etc.)
+    // Advance to the next episode (or next season's E1) — unified for button click + postMessage
+    const handleNextEpisode = () => {
+        const nextEp = episodes.filter(e => e.episode_number > episode).sort((a, b) => a.episode_number - b.episode_number)[0];
+        if (nextEp) {
+            seekEpisode(season, nextEp.episode_number);
+        } else {
+            // End of season — jump to next season E1
+            const nextSeason = movie.seasons
+                ?.filter(s => s.season_number > season)
+                .sort((a, b) => a.season_number - b.season_number)[0];
+            if (nextSeason) seekEpisode(nextSeason.season_number, 1);
+        }
+        setShowNextEpisode(false);
+        setNextEpisodeCountdown(15);
+    };
+
+    const handleNextEpisodeRef = useRef(handleNextEpisode);
+    useEffect(() => { handleNextEpisodeRef.current = handleNextEpisode; });
+
+    // Listen for next-episode events from embedded players
     useEffect(() => {
         if (!isPlaying || type !== 'tv') return;
-        // vidfast sends NEXT_EPISODE_AVAILABLE twice:
-        //   1st fire  = player is suggesting episode X as "up next"
-        //   2nd fire  = player advanced; the 1st suggestion is now current
-        // Track the last suggestion so we can advance on the 2nd fire.
+        // Many players send NEXT_EPISODE_AVAILABLE twice:
+        //   1st fire = player is about to end, suggesting episode X as "up next"
+        //   2nd fire = user clicked the embedded Next button; now suggesting the ep after X
+        // When the 2nd fires with a higher ep, the player has already advanced to X.
         let prevSuggestion = null;
 
         const handler = (e) => {
@@ -341,7 +355,7 @@ function DetailsContent() {
                 const data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
                 if (!data) return;
 
-                // vidfast.pro — consecutive NEXT_EPISODE_AVAILABLE signals an advance
+                // Consecutive NEXT_EPISODE_AVAILABLE pattern
                 if (data.type === 'NEXT_EPISODE_AVAILABLE' && data.data?.season && data.data?.episode) {
                     const { season: s, episode: ep } = data.data;
                     if (prevSuggestion) {
