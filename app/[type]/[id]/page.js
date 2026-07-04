@@ -37,6 +37,8 @@ function DetailsContent() {
     const [playingTrailerKey, setPlayingTrailerKey] = useState(null);
     const [isMuted, setIsMuted] = useState(true);
     const [showTrailer, setShowTrailer] = useState(false);
+    const [showNextEpisode, setShowNextEpisode] = useState(false);
+    const [nextEpisodeCountdown, setNextEpisodeCountdown] = useState(15);
 
     // Load mute preference
     useEffect(() => {
@@ -148,6 +150,62 @@ function DetailsContent() {
         return () => window.removeEventListener('episodeProgressUpdated', handleProgressUpdated);
     }, [id]);
 
+    // Show next-episode button ~30s before the episode ends
+    useEffect(() => {
+        if (!isPlaying || type !== 'tv' || !episodes.length || !movie) {
+            setShowNextEpisode(false);
+            return;
+        }
+        const currentEpIndex = episodes.findIndex(e => e.episode_number === episode);
+        if (currentEpIndex === -1 || currentEpIndex === episodes.length - 1) {
+            setShowNextEpisode(false);
+            return;
+        }
+        setShowNextEpisode(false);
+        setNextEpisodeCountdown(15);
+
+        const currentEp = episodes[currentEpIndex];
+        const runtimeSecs = (currentEp?.runtime || movie.episode_run_time?.[0] || 45) * 60;
+        const progKey = `s${season}e${episode}`;
+        const existingProgress = episodeProgress[progKey] || 0;
+        let elapsed = Math.floor((existingProgress / 100) * runtimeSecs);
+        const showAtSecs = Math.max(runtimeSecs - 30, 0);
+
+        if (elapsed >= showAtSecs) { setShowNextEpisode(true); return; }
+
+        const timer = setInterval(() => {
+            elapsed += 1;
+            if (elapsed >= showAtSecs) {
+                setShowNextEpisode(true);
+                clearInterval(timer);
+            }
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [isPlaying, episode, season, episodes, movie]);
+
+    // Countdown then auto-advance
+    useEffect(() => {
+        if (!showNextEpisode) { setNextEpisodeCountdown(15); return; }
+        let count = 15;
+        setNextEpisodeCountdown(15);
+        const timer = setInterval(() => {
+            count -= 1;
+            setNextEpisodeCountdown(count);
+            if (count <= 0) {
+                clearInterval(timer);
+                const currentIndex = episodes.findIndex(e => e.episode_number === episode);
+                if (currentIndex !== -1 && currentIndex < episodes.length - 1) {
+                    const nextEp = episodes[currentIndex + 1];
+                    setEpisode(nextEp.episode_number);
+                    addToContinueWatching(movie, season, nextEp.episode_number, selectedServer);
+                }
+                setShowNextEpisode(false);
+                setNextEpisodeCountdown(15);
+            }
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [showNextEpisode, episodes, episode, season, movie, selectedServer]);
+
     useEffect(() => {
         if (type !== 'movie' && type !== 'tv') {
             setLoading(false);
@@ -208,6 +266,7 @@ function DetailsContent() {
                 setEpisodes(data.episodes);
                 setSeason(seasonNum);
                 setEpisode(episodeNum);
+                if (serverNum) setSelectedServer(serverNum);
             }
         } catch (error) {
             console.error("Failed to fetch season details", error);
@@ -222,6 +281,17 @@ function DetailsContent() {
             updateEpisodeProgress(movie.id, type === 'tv' ? season : null, type === 'tv' ? episode : null, progData[progKey] || 1);
             addToContinueWatching(movie, type === 'tv' ? season : null, type === 'tv' ? episode : null, selectedServer);
         }
+    };
+
+    const handleNextEpisode = () => {
+        const currentIndex = episodes.findIndex(e => e.episode_number === episode);
+        if (currentIndex !== -1 && currentIndex < episodes.length - 1) {
+            const nextEp = episodes[currentIndex + 1];
+            setEpisode(nextEp.episode_number);
+            addToContinueWatching(movie, season, nextEp.episode_number, selectedServer);
+        }
+        setShowNextEpisode(false);
+        setNextEpisodeCountdown(15);
     };
 
     const trailer = useMemo(() => 
@@ -421,7 +491,7 @@ function DetailsContent() {
                                     {episodes.map((ep) => (
                                         <div
                                             key={ep.id}
-                                            onClick={() => { setEpisode(ep.episode_number); setIsPlaying(true); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                                            onClick={() => { setEpisode(ep.episode_number); setIsPlaying(true); addToContinueWatching(movie, season, ep.episode_number, selectedServer); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                                             className="flex flex-col md:flex-row items-center gap-6 p-4 bg-surface/30 hover:bg-surface/60 transition-standard rounded-xl cursor-pointer group border border-transparent hover:border-white/10"
                                         >
                                             <span className="text-2xl font-black text-text-muted w-8 text-center group-hover:text-white transition-fast">{ep.episode_number}</span>
@@ -660,7 +730,7 @@ function DetailsContent() {
                                     <select value={season} onChange={(e) => fetchSeasonDetails(parseInt(e.target.value))} className="bg-black/60 text-white text-xs border border-white/20 rounded px-3 py-1.5 outline-none focus:border-netflix-red hover:bg-black/80 transition-fast">
                                         {movie.seasons?.filter(s => s.season_number > 0).map(s => <option key={s.id} value={s.season_number}>Season {s.season_number}</option>)}
                                     </select>
-                                    <select value={episode} onChange={(e) => setEpisode(parseInt(e.target.value))} className="bg-black/60 text-white text-xs border border-white/20 rounded px-3 py-1.5 outline-none focus:border-netflix-red hover:bg-black/80 transition-fast">
+                                    <select value={episode} onChange={(e) => { const ep = parseInt(e.target.value); setEpisode(ep); addToContinueWatching(movie, season, ep, selectedServer); }} className="bg-black/60 text-white text-xs border border-white/20 rounded px-3 py-1.5 outline-none focus:border-netflix-red hover:bg-black/80 transition-fast">
                                         {episodes.map(e => <option key={e.id} value={e.episode_number}>Ep {e.episode_number}</option>)}
                                     </select>
                                 </>
@@ -668,6 +738,43 @@ function DetailsContent() {
                         </div>
                     </div>
                     <iframe src={(type === 'movie' ? movieServers : tvServers)[selectedServer].replace('{tmdbId}', id).replace('{season}', season).replace('{episode}', episode)} className="w-full h-full" allowFullScreen allow="autoplay" />
+
+                    {showNextEpisode && (() => {
+                        const nextEp = episodes[episodes.findIndex(e => e.episode_number === episode) + 1];
+                        const circumference = 2 * Math.PI * 20;
+                        return (
+                            <div className="absolute bottom-16 right-8 z-20 flex flex-col items-end gap-2 animate-in slide-in-from-right-4 fade-in duration-300">
+                                <button
+                                    onClick={handleNextEpisode}
+                                    className="flex items-center gap-4 bg-white text-black px-5 py-3 rounded-xl font-bold hover:bg-gray-100 transition-fast active:scale-95 shadow-2xl"
+                                >
+                                    <div className="text-left">
+                                        <p className="text-[10px] uppercase tracking-widest text-black/50 font-black">Next Episode</p>
+                                        <p className="text-sm font-black leading-tight">{nextEp ? `Ep ${nextEp.episode_number}${nextEp.name ? ` • ${nextEp.name}` : ''}` : ''}</p>
+                                    </div>
+                                    <div className="relative w-11 h-11 flex items-center justify-center shrink-0">
+                                        <svg className="absolute inset-0 -rotate-90" viewBox="0 0 44 44">
+                                            <circle cx="22" cy="22" r="20" fill="none" stroke="rgba(0,0,0,0.15)" strokeWidth="3" />
+                                            <circle
+                                                cx="22" cy="22" r="20"
+                                                fill="none" stroke="black" strokeWidth="3"
+                                                strokeDasharray={circumference}
+                                                strokeDashoffset={circumference * (1 - nextEpisodeCountdown / 15)}
+                                                strokeLinecap="round"
+                                            />
+                                        </svg>
+                                        <span className="text-sm font-black relative z-10">{nextEpisodeCountdown}</span>
+                                    </div>
+                                </button>
+                                <button
+                                    onClick={() => setShowNextEpisode(false)}
+                                    className="text-white/50 text-xs hover:text-white transition-fast px-1"
+                                >
+                                    Dismiss
+                                </button>
+                            </div>
+                        );
+                    })()}
                 </div>
             )}
 
